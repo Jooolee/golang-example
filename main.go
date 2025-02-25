@@ -1,138 +1,77 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
+	"net/http"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/gin-gonic/gin"
 )
 
-// User 定义用户结构体
-type User struct {
-	ID    int
-	Name  string
-	Email string
-}
+// https://gin-gonic.com/zh-cn/docs/quickstart/
+// $ curl https://raw.githubusercontent.com/gin-gonic/examples/master/basic/main.go > main.go
 
-// 数据库连接信息
-const (
-	username = "root"
-	password = "root"
-	hostname = "127.0.0.1:3306"
-	dbname   = "public"
-)
+var db = make(map[string]string)
 
-// 构建数据库连接字符串
-func getDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s", username, password, hostname, dbname)
-}
+func setupRouter() *gin.Engine {
+	// Disable Console Color
+	// gin.DisableConsoleColor()
+	r := gin.Default()
 
-// 创建用户
-func createUser(db *sql.DB, name, email string) (int64, error) {
-	result, err := db.Exec("INSERT INTO users (name, email) VALUES (?, ?)", name, email)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
-}
+	// Ping test
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
 
-// 获取所有用户
-func getAllUsers(db *sql.DB) ([]User, error) {
-	rows, err := db.Query("SELECT id, name, email FROM users")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []User
-	for rows.Next() {
-		var user User
-		if err := rows.Scan(&user.ID, &user.Name, &user.Email); err != nil {
-			return nil, err
+	// Get user value
+	r.GET("/user/:name", func(c *gin.Context) {
+		user := c.Params.ByName("name")
+		value, ok := db[user]
+		if ok {
+			c.JSON(http.StatusOK, gin.H{"user": user, "value": value})
+		} else {
+			c.JSON(http.StatusOK, gin.H{"user": user, "status": "no value"})
 		}
-		users = append(users, user)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return users, nil
-}
+	})
 
-// 根据 ID 获取用户
-func getUserByID(db *sql.DB, id int) (User, error) {
-	var user User
-	err := db.QueryRow("SELECT id, name, email FROM users WHERE id = ?", id).Scan(&user.ID, &user.Name, &user.Email)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return User{}, nil
+	// Authorized group (uses gin.BasicAuth() middleware)
+	// Same than:
+	// authorized := r.Group("/")
+	// authorized.Use(gin.BasicAuth(gin.Credentials{
+	//	  "foo":  "bar",
+	//	  "manu": "123",
+	//}))
+	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
+		"foo":  "bar", // user:foo password:bar
+		"manu": "123", // user:manu password:123
+	}))
+
+	/* example curl for /admin with basicauth header
+	   Zm9vOmJhcg== is base64("foo:bar")
+
+		curl -X POST \
+	  	http://localhost:8080/admin \
+	  	-H 'authorization: Basic Zm9vOmJhcg==' \
+	  	-H 'content-type: application/json' \
+	  	-d '{"value":"bar"}'
+	*/
+	authorized.POST("admin", func(c *gin.Context) {
+		user := c.MustGet(gin.AuthUserKey).(string)
+
+		// Parse JSON
+		var json struct {
+			Value string `json:"value" binding:"required"`
 		}
-		return User{}, err
-	}
-	return user, nil
-}
 
-// 更新用户信息
-func updateUser(db *sql.DB, id int, name, email string) error {
-	_, err := db.Exec("UPDATE users SET name = ?, email = ? WHERE id = ?", name, email, id)
-	return err
-}
+		if c.Bind(&json) == nil {
+			db[user] = json.Value
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		}
+	})
 
-// 删除用户
-func deleteUser(db *sql.DB, id int) error {
-	_, err := db.Exec("DELETE FROM users WHERE id = ?", id)
-	return err
+	return r
 }
 
 func main() {
-	// 打开数据库连接
-	db, err := sql.Open("mysql", getDSN())
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// 测试数据库连接
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 创建用户
-	newUserID, err := createUser(db, "John Doe", "john.doe@example.com")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Created user with ID: %d\n", newUserID)
-
-	// 获取所有用户
-	users, err := getAllUsers(db)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("All users:")
-	for _, user := range users {
-		fmt.Printf("ID: %d, Name: %s, Email: %s\n", user.ID, user.Name, user.Email)
-	}
-
-	// 根据 ID 获取用户
-	user, err := getUserByID(db, int(newUserID))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("User with ID %d: Name: %s, Email: %s\n", user.ID, user.Name, user.Email)
-
-	// 更新用户信息
-	err = updateUser(db, int(newUserID), "Jane Doe", "jane.doe@example.com")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("User updated successfully")
-
-	// 删除用户
-	err = deleteUser(db, int(newUserID))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("User deleted successfully")
+	r := setupRouter()
+	// Listen and Server in 0.0.0.0:8080
+	r.Run(":9000")
 }
