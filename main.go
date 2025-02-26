@@ -17,7 +17,7 @@ func setupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// Ping test
-	r.GET("/ping", func(c *gin.Context) {
+	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
 

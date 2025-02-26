@@ -1,9 +1,10 @@
-package main
+package test
 
 import (
 	"database/sql"
 	"fmt"
 	"log"
+	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -84,7 +85,7 @@ func deleteUser(db *sql.DB, id int) error {
 	return err
 }
 
-func main() {
+func TestLocalMysql(*testing.T) {
 	// 打开数据库连接
 	db, err := sql.Open("mysql", getDSN())
 	if err != nil {

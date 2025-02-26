@@ -19,6 +19,8 @@ FROM alpine:latest
 
 # 安装必要的依赖
 RUN apk --no-cache add ca-certificates
+# 如果容器使用的是 Alpine Linux 镜像，需要使用 apk 包管理工具来安装 bash
+RUN apk add --no-cache bash
 
 # 设置工作目录
 WORKDIR /root/
@@ -33,4 +35,4 @@ EXPOSE 9000
 CMD ["./main"]
 
 # docker build -t gin-service .
-# docker run -p 9001:9000 gin-service
+# docker run -p 9001:9000 --name gin-service gin-service 

@@ -20,7 +20,6 @@ func increment() {
 	sharedResource++
 	fmt.Println("Incremented sharedResource to:", sharedResource)
 }
-
 func TestGoroutine(t *testing.T) {
 	var wg sync.WaitGroup
 	// 启动多个 goroutine 并发执行 increment 函数
