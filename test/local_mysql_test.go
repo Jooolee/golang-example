@@ -6,7 +6,7 @@ import (
 	"log"
 	"testing"
 
-	_ "github.com/go-sql-driver/mysql"
+	"golang-example/db"
 )
 
 // User 定义用户结构体
@@ -14,19 +14,6 @@ type User struct {
 	ID    int
 	Name  string
 	Email string
-}
-
-// 数据库连接信息
-const (
-	username = "root"
-	password = "root"
-	hostname = "127.0.0.1:3306"
-	dbname   = "public"
-)
-
-// 构建数据库连接字符串
-func getDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s", username, password, hostname, dbname)
 }
 
 // 创建用户
@@ -86,8 +73,8 @@ func deleteUser(db *sql.DB, id int) error {
 }
 
 func TestLocalMysql(*testing.T) {
-	// 打开数据库连接
-	db, err := sql.Open("mysql", getDSN())
+	// 调用 db 包中的 InitDB 函数初始化数据库连接
+	db, err := db.InitDB()
 	if err != nil {
 		log.Fatal(err)
 	}
